@@ -95,7 +95,7 @@ def user_input_form_page1():
         'Gender': gender,
         'ActivityLevel': exercise
     }
-    
+
     return user_preferences
 
 # Streamlit Frontend UI for Page 2 (Nutrition Preferences)
@@ -123,20 +123,21 @@ def main():
     st.sidebar.title("📚 Navigation")
     page = st.sidebar.radio("Choose a Page", ("Page 1: Demographics & Activity", "Page 2: Nutrition Preferences"))
 
-    user_preferences = {}
+    if 'user_preferences' not in st.session_state:
+        st.session_state.user_preferences = {}
 
     # Page 1: User Demographics & Activity
     if page == "Page 1: Demographics & Activity":
-        user_preferences = user_input_form_page1()
+        st.session_state.user_preferences = user_input_form_page1()
 
     # Page 2: Nutrition Preferences
     elif page == "Page 2: Nutrition Preferences":
-        user_preferences = user_input_form_page2()
+        st.session_state.user_preferences.update(user_input_form_page2())
 
     # Add a button to get recommendations after both pages are filled
     if st.button("🔍 Get Recommendations"):
-        if user_preferences:
-            top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
+        if st.session_state.user_preferences:
+            top_recipes = recommend_recipes(st.session_state.user_preferences, recipes, top_n=5)
             st.write("### Top Recommended Recipes:")
             st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
 
