@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import random
 
 # Load the recipes dataset (make sure this path points to your actual data)
@@ -76,38 +75,41 @@ def user_input_form_page1():
     st.write(f"### Recommended Meals for Your Goal: {goal}")
     st.write(f"Meals that align with your target of {goal.lower()}:")
 
-    # Allow user to automatically plan meals for the week
-    user_meals = {}
-    days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    meal_times = ["Breakfast", "Lunch", "Dinner"]
+    # Button to generate meal plan
+    if st.button("Generate Weekly Meal Plan"):
+        # Randomly select 3 meals for each day (Breakfast, Lunch, Dinner)
+        user_meals = {}
+        days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        meal_times = ["Breakfast", "Lunch", "Dinner"]
 
-    random.shuffle(recommended_recipes['Name'].tolist())  # Shuffle meal options to ensure variety
+        # Ensure variety by shuffling recipes and selecting a meal for each time slot
+        random.shuffle(recommended_recipes['Name'].tolist())  # Shuffle meal options to ensure variety
 
-    meal_plan_data = []
-    for day in days_of_week:
-        user_meals[day] = {}
-        for meal_time in meal_times:
-            # Automatically pick a meal from the shuffled list
-            selected_meal = recommended_recipes['Name'].iloc[len(meal_plan_data) % len(recommended_recipes)]
-            meal_info = recommended_recipes[recommended_recipes['Name'] == selected_meal].iloc[0]
-            user_meals[day][meal_time] = selected_meal
+        meal_plan_data = []
+        for day in days_of_week:
+            user_meals[day] = {}
+            for meal_time in meal_times:
+                # Automatically pick a meal from the shuffled list
+                selected_meal = recommended_recipes['Name'].iloc[len(meal_plan_data) % len(recommended_recipes)]
+                meal_info = recommended_recipes[recommended_recipes['Name'] == selected_meal].iloc[0]
+                user_meals[day][meal_time] = selected_meal
 
-            meal_plan_data.append({
-                'Day': day,
-                'Meal Time': meal_time,
-                'Meal Name': selected_meal,
-                'Calories': meal_info['Calories'],
-                'FatContent': meal_info['FatContent'],
-                'ProteinContent': meal_info['ProteinContent'],
-                'CarbohydrateContent': meal_info['CarbohydrateContent'],
-            })
+                meal_plan_data.append({
+                    'Day': day,
+                    'Meal Time': meal_time,
+                    'Meal Name': selected_meal,
+                    'Calories': meal_info['Calories'],
+                    'FatContent': meal_info['FatContent'],
+                    'ProteinContent': meal_info['ProteinContent'],
+                    'CarbohydrateContent': meal_info['CarbohydrateContent'],
+                })
 
-    # Display the selected meal plan
-    meal_plan_df = pd.DataFrame(meal_plan_data)
-    st.write("### Your Weekly Meal Plan with Nutritional Information")
-    st.write(meal_plan_df)
+        # Display the selected meal plan
+        meal_plan_df = pd.DataFrame(meal_plan_data)
+        st.write("### Your Weekly Meal Plan with Nutritional Information")
+        st.write(meal_plan_df)
 
-    return user_meals
+    return recommended_recipes
 
 # Main function for the app
 def main():
