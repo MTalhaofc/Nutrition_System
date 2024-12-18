@@ -111,6 +111,31 @@ def user_input_form_page1():
 
     return recommended_recipes
 
+# Streamlit Frontend UI for Page 2 (Meal Recommendations)
+def user_input_form_page2():
+    st.title('🍽️ Get 5 Meal Recommendations')
+
+    # Collect user input for nutrition preferences
+    calories = st.slider('Max Calories per Meal:', 0, 1000, 500)
+    protein = st.slider('Min Protein Content (g):', 0, 100, 20)
+    fat = st.slider('Max Fat Content (g):', 0, 100, 15)
+    carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
+
+    # Filter recipes based on the nutrition preferences
+    filtered_recipes = recipes[
+        (recipes['Calories'] <= calories) &
+        (recipes['ProteinContent'] >= protein) &
+        (recipes['FatContent'] <= fat) &
+        (recipes['CarbohydrateContent'] <= carbs)
+    ]
+
+    # Button to get 5 meal recommendations
+    if st.button("Get 5 Meal Recommendations"):
+        # Randomly select 5 meals from the filtered recipes
+        recommended_meals = filtered_recipes.sample(n=5)
+        st.write("### Top 5 Recommended Meals:")
+        st.write(recommended_meals[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
+
 # Main function for the app
 def main():
     st.sidebar.title("📚 Navigation")
@@ -120,7 +145,9 @@ def main():
     if page == "Page 1: Weekly Meal Plan":
         user_meals = user_input_form_page1()
 
-    # Additional pages and logic can be added here
+    # Page 2: Meal Recommendations
+    elif page == "Page 2: Nutrition Preferences":
+        user_input_form_page2()
 
 if __name__ == "__main__":
     main()
