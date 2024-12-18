@@ -3,7 +3,7 @@ import pandas as pd
 import openai
 
 # Set OpenAI API Key (Use your own key here)
-openai.api_key = "sk-abcdefabcdefabcdefabcdefabcdefabcdef12"  # Replace with your OpenAI API key
+openai.api_key = "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"  # Replace with your OpenAI API key
 
 # Load the datasets (replace with your paths or upload them)
 recipes_path = 'recipes.csv'
