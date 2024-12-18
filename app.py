@@ -3,6 +3,9 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from langchain.llms import OpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 
 # Load the datasets (replace with your paths or upload them)
 recipes_path = 'recipes.csv'
@@ -25,7 +28,7 @@ average_ratings.rename(columns={'Rating': 'AverageRating'}, inplace=True)
 recipes = recipes.merge(average_ratings, on='RecipeId', how='left')
 recipes['AverageRating'] = recipes['AverageRating'].fillna(0)
 
-# Recommendation System
+# Recommendation System (as previously defined)
 def recommend_recipes(user_prefs, recipes_df, top_n=5):
     nutrition_columns = ['Calories', 'FatContent', 'SodiumContent', 'CarbohydrateContent', 'ProteinContent']
     
@@ -55,73 +58,47 @@ def recommend_recipes(user_prefs, recipes_df, top_n=5):
     recommendations = recipes_scaled.sort_values(by=['Similarity', 'AverageRating'], ascending=[False, False])
     return recommendations.head(top_n)
 
-# Streamlit Frontend UI for Page 1 (Demographic and Activity)
-def user_input_form_page1():
-    st.title('User Demographics & Activity Level')
-
-    # Collect user demographic and activity data
-    age = st.number_input('Enter your age:', min_value=0, max_value=120, value=25)
-    gender = st.selectbox('Select your gender:', ['Male', 'Female', 'Other'])
-    height = st.number_input('Enter your height (in cm):', min_value=50, max_value=250, value=170)
-    weight = st.number_input('Enter your weight (in kg):', min_value=10, max_value=300, value=70)
-    exercise = st.selectbox(
-        'Select your activity level:', 
-        ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Extra Active']
-    )
-
-    # Calculate estimated daily calorie needs based on user input (simplified Harris-Benedict formula)
-    if gender == 'Male':
-        bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age)
-    else:
-        bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)
-
-    activity_multiplier = {
-        'Sedentary': 1.2,
-        'Lightly Active': 1.375,
-        'Moderately Active': 1.55,
-        'Very Active': 1.725,
-        'Extra Active': 1.9
-    }
-
-    daily_calorie_needs = bmr * activity_multiplier[exercise]
-    st.write(f"Based on your input, your estimated daily calorie needs are: {int(daily_calorie_needs)} kcal.")
-
-    # Update user preferences with demographic information
-    user_preferences = {
-        'EstimatedCalories': daily_calorie_needs,
-        'Age': age,
-        'Height': height,
-        'Weight': weight,
-        'Gender': gender,
-        'ActivityLevel': exercise
-    }
+# LangChain Chatbot
+def chatbot_query(query):
+    # Load recipe data and format a response
+    recipe_names = recipes['Name'].to_list()
+    recipes_str = "\n".join(recipe_names)
     
-    return user_preferences
-
-# Streamlit Frontend UI for Page 2 (Nutrition Preferences)
-def user_input_form_page2():
-    st.title('Nutrition Preferences')
-
-    # Collect user input for preferences
-    calories = st.slider('Max Calories:', 0, 1000, 500)
-    protein = st.slider('Min Protein Content (g):', 0, 100, 20)
-    fat = st.slider('Max Fat Content (g):', 0, 100, 15)
-    carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
-
-    # Update user preferences with nutrition data
-    user_preferences = {
-        'Calories': calories,
-        'ProteinContent': protein,
-        'FatContent': fat,
-        'CarbohydrateContent': carbs
-    }
+    # Create a prompt template with the available data
+    prompt_template = """
+    You are a helpful assistant that answers questions about recipes and nutrition.
+    Here is a list of recipes:
+    {recipes_list}
     
-    return user_preferences
+    Answer the following query: {query}
+    """
+    
+    # Format the prompt with the data and the query
+    prompt = prompt_template.format(recipes_list=recipes_str, query=query)
+    
+    # Use LangChain with OpenAI or another LLM to generate the response
+    llm = OpenAI(model="text-davinci-003")  # You can change this to the LLM you are using
+    prompt_template = PromptTemplate(input_variables=["query", "recipes_list"], template=prompt)
+    chain = LLMChain(llm=llm, prompt=prompt_template)
+    
+    response = chain.run(query=query, recipes_list=recipes_str)
+    
+    return response
 
-# Main logic for the app
+# Streamlit Frontend UI for Chatbot Page
+def user_input_form_page3():
+    st.title("Chatbot: Ask Me About Recipes & Nutrition")
+
+    user_query = st.text_input("Ask me anything about recipes or nutrition:")
+
+    if user_query:
+        response = chatbot_query(user_query)
+        st.write("Answer: ", response)
+
+# Main logic for the app with 3 pages
 def main():
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Choose a Page", ("Page 1: Demographics & Activity", "Page 2: Nutrition Preferences"))
+    page = st.sidebar.radio("Choose a Page", ("Page 1: Demographics & Activity", "Page 2: Nutrition Preferences", "Page 3: Chatbot"))
 
     user_preferences = {}
 
@@ -133,8 +110,12 @@ def main():
     elif page == "Page 2: Nutrition Preferences":
         user_preferences = user_input_form_page2()
 
+    # Page 3: Chatbot
+    elif page == "Page 3: Chatbot":
+        user_input_form_page3()
+
     # Add a button to get recommendations after both pages are filled
-    if st.button("Get Recommendations"):
+    if page != "Page 3: Chatbot" and st.button("Get Recommendations"):
         if user_preferences:
             top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
             st.write("### Top Recommended Recipes:")
