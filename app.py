@@ -106,8 +106,11 @@ def user_input_form():
 # Main
 user_preferences = user_input_form()
 
-# Show the recommendations when the user submits their preferences
-if user_preferences:
+# Add a button for user to submit their preferences
+submit_button = st.button('Get Recommendations')
+
+# Show the recommendations when the user clicks the button
+if submit_button and user_preferences:
     top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
     
     st.write("### Top Recommended Recipes:")
