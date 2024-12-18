@@ -6,6 +6,10 @@ import numpy as np
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+import os
+
+# Set OpenAI API Key (Use your own key here)
+os.environ["OPENAI_API_KEY"] = "sk-abcdefabcdefabcdefabcdefabcdefabcdef12"  # Replace with your OpenAI API key
 
 # Load the datasets (replace with your paths or upload them)
 recipes_path = 'recipes.csv'
