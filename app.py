@@ -54,6 +54,26 @@ def recommend_meals(tdee, goal):
     recommended_recipes = recipes.iloc[recommended_indices]
     return recommended_recipes
 
+def generate_weekly_meal_plan(recommended_recipes, days_of_week=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], meal_times=["Breakfast", "Lunch", "Dinner"]):
+    meal_plan_data = []
+    shuffled_recipes = recommended_recipes.sample(frac=1).reset_index(drop=True)
+
+    for day in days_of_week:
+        for meal_time in meal_times:
+            selected_meal = shuffled_recipes.iloc[len(meal_plan_data) % len(shuffled_recipes)]
+            meal_plan_data.append({
+                'Day': day,
+                'Meal Time': meal_time,
+                'Meal Name': selected_meal['Name'],
+                'Calories': selected_meal['Calories'],
+                'FatContent': selected_meal['FatContent'],
+                'ProteinContent': selected_meal['ProteinContent'],
+                'CarbohydrateContent': selected_meal['CarbohydrateContent'],
+            })
+
+    meal_plan_df = pd.DataFrame(meal_plan_data)
+    return meal_plan_df
+
 def user_input_form_page1():
     st.title('👤 User Demographics & Activity Level')
 
@@ -77,7 +97,10 @@ def user_input_form_page1():
     st.write(f"### Recommended Meals for Your Goal: {goal}")
     st.write(f"Meals that align with your target of {goal.lower()}:")
 
-    st.write(recommended_recipes[['Name', 'Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']])
+    if st.button("Generate Weekly Meal Plan"):
+        meal_plan_df = generate_weekly_meal_plan(recommended_recipes)
+        st.write("### Your Weekly Meal Plan with Nutritional Information")
+        st.write(meal_plan_df)
 
     return recommended_recipes
 
