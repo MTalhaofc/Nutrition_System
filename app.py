@@ -52,10 +52,10 @@ def user_input_form_page1():
     st.title('👤 User Demographics & Activity Level')
 
     # Collect user demographic and activity data
-    age = st.number_input('Enter your age:', min_value=0, max_value=120, value=25)
+    age = st.number_input('Enter your age:', min_value=0, max_value=120, value=25, step=1)
     gender = st.selectbox('Select your gender:', ['Male', 'Female', 'Other'])
-    height = st.number_input('Enter your height (in cm):', min_value=50, max_value=250, value=170)
-    weight = st.number_input('Enter your weight (in kg):', min_value=10, max_value=300, value=70)
+    height = st.number_input('Enter your height (in cm):', min_value=50, max_value=250, value=170, step=1)
+    weight = st.number_input('Enter your weight (in kg):', min_value=10, max_value=300, value=70, step=1)
     exercise = st.selectbox(
         'Select your activity level:', 
         ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Extra Active']
@@ -73,7 +73,7 @@ def user_input_form_page1():
 
     # Display recommended meals for the goal
     st.write(f"### Recommended Meals for Your Goal: {goal}")
-    st.write(f"Meals that align with your target of {goal.lower()}:")
+    st.write(recommended_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
 
     # Button to generate meal plan
     if st.button("Generate Weekly Meal Plan"):
@@ -103,8 +103,6 @@ def user_input_form_page1():
         meal_plan_df = pd.DataFrame(meal_plan_data)
         st.write("### Your Weekly Meal Plan with Nutritional Information")
         st.write(meal_plan_df)
-
-    return recommended_recipes
 
 # Streamlit Frontend UI for Page 2 (Meal Recommendations)
 def user_input_form_page2():
