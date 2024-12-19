@@ -4,15 +4,12 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-
-# Load data
 recipes_path = 'recipes.csv'
 recipes = pd.read_csv(recipes_path, on_bad_lines='skip')
 
 nutritional_columns = ['RecipeId', 'Name', 'Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']
 recipes = recipes[nutritional_columns].dropna()
 
-# Normalize nutritional columns
 scaler = MinMaxScaler()
 recipes[['Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']] = scaler.fit_transform(
     recipes[['Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']])
@@ -42,14 +39,10 @@ def recommend_meals(tdee, goal):
     else:
         target_calories = tdee
 
-    # Normalize target values for similarity comparison
     target_values = np.array([[target_calories, target_calories, target_calories, target_calories]])
     target_scaled = scaler.transform(target_values)
 
-    # Compute similarity scores between target and recipes
     similarity_scores = cosine_similarity(target_scaled, recipes[['Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']])
-    
-    # Get top 5 most similar recipes based on cosine similarity
     recommended_indices = similarity_scores[0].argsort()[-5:][::-1]
     recommended_recipes = recipes.iloc[recommended_indices]
     return recommended_recipes
@@ -104,6 +97,17 @@ def user_input_form_page1():
 
     return recommended_recipes
 
+def recommend_meals_by_preferences(calories, protein, fat, carbs):
+    user_preferences = np.array([[calories, fat, protein, carbs]])
+    user_preferences_scaled = scaler.transform(user_preferences)
+    
+    similarity_scores = cosine_similarity(user_preferences_scaled, recipes[['Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']])
+    
+    recommended_indices = similarity_scores[0].argsort()[-5:][::-1]
+    recommended_recipes = recipes.iloc[recommended_indices]
+    
+    return recommended_recipes
+
 def user_input_form_page2():
     st.title('🍽️ Get 5 Meal Recommendations')
     
@@ -119,14 +123,15 @@ def user_input_form_page2():
         (recipes['CarbohydrateContent'] <= carbs)
     ]
 
-    if st.button("Get 5 Meal Recommendations"):
-        if not filtered_recipes.empty:
-            num_meals = min(5, len(filtered_recipes))
-            recommended_meals = filtered_recipes.sample(n=num_meals)
-            st.write("### Top 5 Recommended Meals:")
-            st.write(recommended_meals[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
-        else:
-            st.write("❌ No meals match your preferences. Try adjusting your inputs.")
+    if not filtered_recipes.empty:
+        recommended_meals = filtered_recipes.sample(n=5)
+        st.write("### Top 5 Recommended Meals:")
+        st.write(recommended_meals[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
+    else:
+        st.write("❌ No meals match your exact preferences. Here are 5 meals that are closest to your input.")
+        recommended_meals = recommend_meals_by_preferences(calories, protein, fat, carbs)
+        st.write("### Closest 5 Meal Recommendations:")
+        st.write(recommended_meals[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
 
 def main():
     st.sidebar.title("📚 Navigation")
