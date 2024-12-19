@@ -12,8 +12,8 @@ reviews = pd.read_csv(reviews_path, on_bad_lines='skip')
 
 # Preprocessing and Cleaning
 nutritional_columns = [
-    'RecipeId', 'Name', 'Calories', 'FatContent', 'SaturatedFatContent',
-    'SodiumContent', 'CarbohydrateContent', 'FiberContent', 'SugarContent', 'ProteinContent'
+    'RecipeId', 'Name', 'Calories', 'FatContent', 'SodiumContent', 
+    'CarbohydrateContent', 'ProteinContent', 'AverageRating'
 ]
 recipes.columns = recipes.columns.str.strip()
 recipes = recipes[nutritional_columns].dropna()
@@ -54,9 +54,21 @@ def recommend_recipes(user_prefs, recipes_df, top_n=5):
     recommendations = recipes_scaled.sort_values(by=['Similarity', 'AverageRating'], ascending=[False, False])
     return recommendations.head(top_n)
 
-# Streamlit Frontend UI for Page 1 (Demographic and Activity)
+# Generate Weekly Meal Plan
+def generate_weekly_meal_plan(calorie_needs, recipes_df):
+    daily_calories = calorie_needs
+    weekly_plan = []
+    
+    for _ in range(7):  # For 7 days of the week
+        daily_recipes = recipes_df[recipes_df['Calories'] <= daily_calories].sample(3)  # 3 meals per day
+        weekly_plan.append(daily_recipes)
+        daily_calories = calorie_needs  # Reset daily calories
+    
+    return pd.concat(weekly_plan)
+
+# Streamlit Frontend UI for Page 1 (User Details and Weekly Meal Plan)
 def user_input_form_page1():
-    st.title('User Demographics & Activity Level')
+    st.title('User Details and Weekly Meal Plan')
 
     # Collect user demographic and activity data
     age = st.number_input('Enter your age:', min_value=0, max_value=120, value=25)
@@ -85,55 +97,50 @@ def user_input_form_page1():
     daily_calorie_needs = bmr * activity_multiplier[exercise]
     st.write(f"Based on your input, your estimated daily calorie needs are: {int(daily_calorie_needs)} kcal.")
 
-    # Update user preferences with demographic information
-    user_preferences = {
-        'EstimatedCalories': daily_calorie_needs,
-        'Age': age,
-        'Height': height,
-        'Weight': weight,
-        'Gender': gender,
-        'ActivityLevel': exercise
-    }
-    
-    return user_preferences
+    # Generate weekly meal plan
+    if st.button("Generate Weekly Meal Plan"):
+        weekly_meal_plan = generate_weekly_meal_plan(daily_calorie_needs, recipes)
+        st.write("### Your Weekly Meal Plan:")
+        st.write(weekly_meal_plan[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
+
+    return daily_calorie_needs
 
 # Streamlit Frontend UI for Page 2 (Nutrition Preferences)
-def user_input_form_page2(daily_calorie_needs):
+def user_input_form_page2():
     st.title('Nutrition Preferences')
+
     # Collect user input for preferences
-    calories = st.slider('Max Calories:', 0, 1000, int(daily_calorie_needs))
+    calories = st.slider('Max Calories:', 0, 1000, 500)
     protein = st.slider('Min Protein Content (g):', 0, 100, 20)
     fat = st.slider('Max Fat Content (g):', 0, 100, 15)
     carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
+
     # Update user preferences with nutrition data
     user_preferences = {
         'Calories': calories,
         'ProteinContent': protein,
         'FatContent': fat,
-        'CarbohydrateContent': carbs,
+        'CarbohydrateContent': carbs
     }
 
-    return user_preferences
+    # Recommend recipes based on preferences
+    if st.button("Get Recipe Recommendations"):
+        top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
+        st.write("### Top Recommended Recipes:")
+        st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
 
 # Main logic for the app
 def main():
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Choose a Page", ("Page 1: Demographics & Activity", "Page 2: Nutrition Preferences"))
-    user_preferences = {}
+    page = st.sidebar.radio("Choose a Page", ("Page 1: Weekly Meal Plan", "Page 2: Nutrition Preferences"))
 
-    # Page 1: User Demographics & Activity
-    if page == "Page 1: Demographics & Activity":
-        user_preferences = user_input_form_page1()
+    # Page 1: Weekly Meal Plan
+    if page == "Page 1: Weekly Meal Plan":
+        user_input_form_page1()
+
     # Page 2: Nutrition Preferences
-    elif page == "Page 2: Nutrition Preferences" and 'EstimatedCalories' in user_preferences:
-        user_preferences.update(user_input_form_page2(user_preferences['EstimatedCalories']))
-
-    # Add a button to get recommendations after both pages are filled
-    if st.button("Get Recommendations"):
-        if user_preferences:
-            top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
-            st.write("### Top Recommended Recipes:")
-            st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
+    elif page == "Page 2: Nutrition Preferences":
+        user_input_form_page2()
 
 if __name__ == "__main__":
     main()
