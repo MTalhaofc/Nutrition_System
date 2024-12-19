@@ -109,16 +109,26 @@ def user_input_form_page1():
 
     if st.button("Generate Weekly Meal Plan"):
         weekly_meal_plan = generate_weekly_meal_plan(tdee, recipes)
-        weekly_meal_plan = weekly_meal_plan[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']]
+        
+        # Print the columns to check what's available
+        st.write("### Available Columns in Weekly Meal Plan:")
+        st.write(weekly_meal_plan.columns)
 
-        missing_columns = [col for col in ['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating'] if col not in weekly_meal_plan.columns]
-        if missing_columns:
+        # Check if all the expected columns are available
+        expected_columns = ['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']
+        available_columns = [col for col in expected_columns if col in weekly_meal_plan.columns]
+
+        if len(available_columns) != len(expected_columns):
+            missing_columns = list(set(expected_columns) - set(available_columns))
             st.error(f"Missing columns in weekly meal plan: {', '.join(missing_columns)}")
         else:
+            # If all expected columns are available, display the filtered DataFrame
+            weekly_meal_plan = weekly_meal_plan[available_columns]
             st.write("### Your Weekly Meal Plan:")
             st.write(weekly_meal_plan)
 
     return tdee
+
 
 # Streamlit Frontend UI for Page 2 (Nutrition Preferences)
 def user_input_form_page2():
