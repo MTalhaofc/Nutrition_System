@@ -30,7 +30,7 @@ def calculate_tdee(bmr, activity_level):
     return bmr * activity_multiplier[activity_level]
 
 # Function to recommend meals based on TDEE and user goal
-def recommend_meals(tdee, goal):
+def recommend_meals(tdee, goal, num_meals=5):
     # Adjust the meal recommendations based on goal
     if goal == "Gain Weight":
         target_calories = tdee + 500  # Surplus for weight gain
@@ -45,7 +45,8 @@ def recommend_meals(tdee, goal):
     # Filter recipes based on the calorie range
     recommended_recipes = recipes[(recipes['Calories'] >= calorie_range[0]) & (recipes['Calories'] <= calorie_range[1])]
 
-    return recommended_recipes
+    # Select a random sample of meals for display (ensuring variety)
+    return recommended_recipes.sample(n=num_meals)
 
 # Streamlit Frontend UI for Page 1 (Meal Planning)
 def user_input_form_page1():
@@ -73,9 +74,15 @@ def user_input_form_page1():
 
     # Display recommended meals for the goal
     st.write(f"### Recommended Meals for Your Goal: {goal}")
-    st.write(recommended_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
+    st.write(f"Meals that align with your target of {goal.lower()}:")
 
-    # Button to generate meal plan
+    # Display a list of recommended meals with nutritional information
+    for idx, row in recommended_recipes.iterrows():
+        st.write(f"**{row['Name']}**")
+        st.write(f"Calories: {row['Calories']} kcal, Protein: {row['ProteinContent']} g, Fat: {row['FatContent']} g, Carbs: {row['CarbohydrateContent']} g")
+        st.write("---")
+
+    # Button to generate weekly meal plan
     if st.button("Generate Weekly Meal Plan"):
         # Randomly select meals for each day
         user_meals = {}
