@@ -38,15 +38,20 @@ def recommend_recipes(user_prefs, recipes_df, top_n=5):
 def generate_weekly_meal_plan(calorie_needs, recipes_df):
     daily_calories = calorie_needs
     weekly_plan = []
-    meals_per_day = 3  # Breakfast, Lunch, Dinner
-    shuffled_recipes = recipes_df.sample(frac=1).reset_index(drop=True)  # Shuffle the entire recipes dataframe
-
-    for _ in range(7):  # 7 days in a week
-        daily_recipes = shuffled_recipes[shuffled_recipes['Calories'] <= daily_calories].head(meals_per_day)
-        weekly_plan.append(daily_recipes)
-        shuffled_recipes = shuffled_recipes[~shuffled_recipes.index.isin(daily_recipes.index)]  # Remove used recipes
-
-    return pd.concat(weekly_plan)
+    meals_per_day = 3
+    shuffled_recipes = recipes_df.sample(frac=1).reset_index(drop=True)
+    all_selected_meals = set()
+    for _ in range(7):
+        daily_recipes = []
+        daily_shuffled = shuffled_recipes[shuffled_recipes['Calories'] <= daily_calories]
+        for meal_time in range(meals_per_day):
+            available_recipes = daily_shuffled[~daily_shuffled['Name'].isin(all_selected_meals)]
+            if not available_recipes.empty:
+                selected_meal = available_recipes.sample(1).iloc[0]
+                daily_recipes.append(selected_meal)
+                all_selected_meals.add(selected_meal['Name'])
+        weekly_plan.append(pd.DataFrame(daily_recipes))
+    return pd.concat(weekly_plan, ignore_index=True)
 
 def calculate_bmr(age, weight, height, gender):
     if gender == 'Male':
@@ -67,15 +72,14 @@ def calculate_tdee(bmr, activity_level):
 
 def recommend_meals(tdee, goal):
     if goal == "Gain Weight":
-        target_calories = tdee + 500  # Surplus for weight gain
+        target_calories = tdee + 500
         calorie_range = (target_calories - 100, target_calories + 100)
     elif goal == "Lose Weight":
-        target_calories = tdee - 500  # Deficit for weight loss
+        target_calories = tdee - 500
         calorie_range = (target_calories - 100, target_calories + 100)
     else:
-        target_calories = tdee  # Maintain weight
+        target_calories = tdee
         calorie_range = (target_calories - 100, target_calories + 100)
-
     recommended_recipes = recipes[(recipes['Calories'] >= calorie_range[0]) & (recipes['Calories'] <= calorie_range[1])]
     return recommended_recipes.sample(n=5)
 
@@ -110,12 +114,48 @@ def user_input_form_page1():
 
     return tdee
 
+def user_input_form_page2():
+    st.title('🍽️ Get 5 Meal Recommendations')
+    
+    st.title('Nutrition Preferences')
+    calories = st.slider('Max Calories per Meal:', 0, 1000, 500)
+    protein = st.slider('Min Protein Content (g):', 0, 100, 20)
+    fat = st.slider('Max Fat Content (g):', 0, 100, 15)
+    carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
+
+    filtered_recipes = recipes[
+        (recipes['Calories'] <= calories) &
+        (recipes['ProteinContent'] >= protein) &
+        (recipes['FatContent'] <= fat) &
+        (recipes['CarbohydrateContent'] <= carbs)
+    ]
+    if st.button("Get 5 Meal Recommendations"):
+        if not filtered_recipes.empty:
+            num_meals = min(5, len(filtered_recipes))
+            recommended_meals = filtered_recipes.sample(n=num_meals)
+            st.write("### Top 5 Recommended Meals:")
+            st.write(recommended_meals[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
+        else:
+            st.write("❌ No meals match your preferences. Try adjusting your inputs.")
+
+    user_preferences = {
+        'Calories': calories,
+        'ProteinContent': protein,
+        'FatContent': fat,
+        'CarbohydrateContent': carbs
+    }
+    if st.button("Get Recipe Recommendations"):
+        top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
+        st.write("### Top Recommended Recipes:")
+        st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
+
 def main():
     st.sidebar.title("📚 Navigation")
     page = st.sidebar.radio("Choose a Page", ("Page 1: Weekly Meal Plan", "Page 2: Nutrition Preferences"))
 
     if page == "Page 1: Weekly Meal Plan":
         user_input_form_page1()
+
     elif page == "Page 2: Nutrition Preferences":
         user_input_form_page2()
 
