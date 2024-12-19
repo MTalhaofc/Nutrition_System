@@ -1,55 +1,71 @@
 import streamlit as st
 import pandas as pd
-import random
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
-# Load the recipes dataset (make sure this path points to your actual data)
+# Load the datasets (replace with your paths or upload them)
 recipes_path = 'recipes.csv'
-recipes = pd.read_csv(recipes_path, on_bad_lines='skip')
+reviews_path = 'reviews.csv'
 
-# Preprocessing recipes (assuming columns like 'RecipeId', 'Name', 'Calories', 'FatContent', etc.)
-nutritional_columns = ['RecipeId', 'Name', 'Calories', 'FatContent', 'ProteinContent', 'CarbohydrateContent']
+recipes = pd.read_csv(recipes_path, on_bad_lines='skip')
+reviews = pd.read_csv(reviews_path, on_bad_lines='skip')
+
+# Preprocessing and Cleaning
+nutritional_columns = [
+    'RecipeId', 'Name', 'Calories', 'FatContent', 'SaturatedFatContent',
+    'SodiumContent', 'CarbohydrateContent', 'FiberContent', 'SugarContent', 'ProteinContent'
+]
+recipes.columns = recipes.columns.str.strip()
 recipes = recipes[nutritional_columns].dropna()
 
-# Function to calculate BMR (Basal Metabolic Rate) using the Harris-Benedict equation
-def calculate_bmr(age, weight, height, gender):
-    if gender == 'Male':
-        bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age)
-    else:
-        bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)
-    return bmr
+# Aggregate reviews to compute average ratings
+average_ratings = reviews.groupby('RecipeId')['Rating'].mean().reset_index()
+average_ratings.rename(columns={'Rating': 'AverageRating'}, inplace=True)
+recipes = recipes.merge(average_ratings, on='RecipeId', how='left')
+recipes['AverageRating'] = recipes['AverageRating'].fillna(0)
 
-# Function to calculate TDEE (Total Daily Energy Expenditure)
-def calculate_tdee(bmr, activity_level):
-    activity_multiplier = {
-        'Sedentary': 1.2,
-        'Lightly Active': 1.375,
-        'Moderately Active': 1.55,
-        'Very Active': 1.725,
-        'Extra Active': 1.9
-    }
-    return bmr * activity_multiplier[activity_level]
+# Recommendation System
+def recommend_recipes(user_prefs, recipes_df, top_n=5):
+    nutrition_columns = ['Calories', 'FatContent', 'SodiumContent', 'CarbohydrateContent', 'ProteinContent']
 
-# Function to recommend meals based on TDEE and user goal
-def recommend_meals(tdee, goal):
-    # Adjust the meal recommendations based on goal
-    if goal == "Gain Weight":
-        target_calories = tdee + 500  # Surplus for weight gain
-        calorie_range = (target_calories - 100, target_calories + 100)  # Allow a range around the target
-    elif goal == "Lose Weight":
-        target_calories = tdee - 500  # Deficit for weight loss
-        calorie_range = (target_calories - 100, target_calories + 100)
-    else:
-        target_calories = tdee  # Maintain weight
-        calorie_range = (target_calories - 100, target_calories + 100)
+    # Fill missing values in recipes dataset with median
+    for col in nutrition_columns:
+        recipes_df[col] = recipes_df[col].fillna(recipes_df[col].median())
 
-    # Filter recipes based on the calorie range
-    recommended_recipes = recipes[(recipes['Calories'] >= calorie_range[0]) & (recipes['Calories'] <= calorie_range[1])]
-    
-    return recommended_recipes
+    # Ensure user preferences have all necessary columns
+    for col in nutrition_columns:
+        if col not in user_prefs:
+            user_prefs[col] = recipes_df[col].median()  # Fill missing user preference with the median
 
-# Streamlit Frontend UI for Page 1 (Meal Planning)
+    # Scale nutritional data
+    scaler = MinMaxScaler()
+    recipes_scaled = recipes_df.copy()
+    recipes_scaled[nutrition_columns] = scaler.fit_transform(recipes_df[nutrition_columns])
+
+    # Prepare user preferences for scaling
+    user_vector = pd.DataFrame([user_prefs], columns=nutrition_columns)
+    user_vector = scaler.transform(user_vector)
+
+    # Compute cosine similarity
+    similarity = cosine_similarity(user_vector, recipes_scaled[nutrition_columns])
+    recipes_scaled['Similarity'] = similarity[0]
+
+    # Sort by similarity and rating
+    recommendations = recipes_scaled.sort_values(by=['Similarity', 'AverageRating'], ascending=[False, False])
+    return recommendations.head(top_n)
+
+# Streamlit Frontend UI
+def user_input_form():
+    st.title('Nutrition Recommendation System')
+    # Collect user input for preferences
+    calories = st.slider('Max Calories:', 0, 1000, 500)
+    protein = st.slider('Min Protein Content (g):', 0, 100, 20)
+    fat = st.slider('Max Fat Content (g):', 0, 100, 15)
+    carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
+# Streamlit Frontend UI for Page 1 (Demographic and Activity)
 def user_input_form_page1():
-    st.title('👤 User Demographics & Activity Level')
+    st.title('User Demographics & Activity Level')
 
     # Collect user demographic and activity data
     age = st.number_input('Enter your age:', min_value=0, max_value=120, value=25)
@@ -60,94 +76,83 @@ def user_input_form_page1():
         'Select your activity level:', 
         ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Extra Active']
     )
-    goal = st.selectbox('Select your goal:', ['Maintain Weight', 'Gain Weight', 'Lose Weight'])
 
-    # Calculate BMR and TDEE
-    bmr = calculate_bmr(age, weight, height, gender)
-    tdee = calculate_tdee(bmr, exercise)
+    # Calculate estimated daily calorie needs based on user input (simplified Harris-Benedict formula)
+    if gender == 'Male':
+        bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age)
+    else:
+        bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)
 
-    st.write(f"💡 Based on your input, your estimated daily calorie needs are: {int(tdee)} kcal.")
+    activity_multiplier = {
+        'Sedentary': 1.2,
+        'Lightly Active': 1.375,
+        'Moderately Active': 1.55,
+        'Very Active': 1.725,
+        'Extra Active': 1.9
+    }
 
-    # Recommend meals based on TDEE and goal
-    recommended_recipes = recommend_meals(tdee, goal)
+    daily_calorie_needs = bmr * activity_multiplier[exercise]
+    st.write(f"Based on your input, your estimated daily calorie needs are: {int(daily_calorie_needs)} kcal.")
 
-    # Display recommended meals for the goal
-    st.write(f"### Recommended Meals for Your Goal: {goal}")
-    st.write(f"Meals that align with your target of {goal.lower()}:")
-
-    # Button to generate meal plan
-    if st.button("Generate Weekly Meal Plan"):
-        # Randomly select 3 meals for each day (Breakfast, Lunch, Dinner)
-        user_meals = {}
-        days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        meal_times = ["Breakfast", "Lunch", "Dinner"]
-
-        # Ensure variety by shuffling recipes and selecting a meal for each time slot
-        random.shuffle(recommended_recipes['Name'].tolist())  # Shuffle meal options to ensure variety
-
-        meal_plan_data = []
-        for day in days_of_week:
-            user_meals[day] = {}
-            for meal_time in meal_times:
-                # Automatically pick a meal from the shuffled list
-                selected_meal = recommended_recipes['Name'].iloc[len(meal_plan_data) % len(recommended_recipes)]
-                meal_info = recommended_recipes[recommended_recipes['Name'] == selected_meal].iloc[0]
-                user_meals[day][meal_time] = selected_meal
-
-                meal_plan_data.append({
-                    'Day': day,
-                    'Meal Time': meal_time,
-                    'Meal Name': selected_meal,
-                    'Calories': meal_info['Calories'],
-                    'FatContent': meal_info['FatContent'],
-                    'ProteinContent': meal_info['ProteinContent'],
-                    'CarbohydrateContent': meal_info['CarbohydrateContent'],
-                })
-
-        # Display the selected meal plan
-        meal_plan_df = pd.DataFrame(meal_plan_data)
-        st.write("### Your Weekly Meal Plan with Nutritional Information")
-        st.write(meal_plan_df)
-
-    return recommended_recipes
-
-# Streamlit Frontend UI for Page 2 (Meal Recommendations)
+    # Update user preferences with demographic information
+    user_preferences = {
+        'EstimatedCalories': daily_calorie_needs,
+        'Age': age,
+        'Height': height,
+        'Weight': weight,
+        'Gender': gender,
+        'ActivityLevel': exercise
+    }
+    
+    return user_preferences
+# Streamlit Frontend UI for Page 2 (Nutrition Preferences)
 def user_input_form_page2():
-    st.title('🍽️ Get 5 Meal Recommendations')
-
-    # Collect user input for nutrition preferences
-    calories = st.slider('Max Calories per Meal:', 0, 1000, 500)
+    st.title('Nutrition Preferences')
+    # Collect user input for preferences
+    calories = st.slider('Max Calories:', 0, 1000, 500)
     protein = st.slider('Min Protein Content (g):', 0, 100, 20)
     fat = st.slider('Max Fat Content (g):', 0, 100, 15)
     carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
+    # Update user preferences with nutrition data
+    user_preferences = {
+        'Calories': calories,
+        'ProteinContent': protein,
+        'FatContent': fat,
+        'CarbohydrateContent': carbs,
+        'EstimatedCalories': daily_calorie_needs  # Optional for further customization
+        'CarbohydrateContent': carbs
+    }
 
-    # Filter recipes based on the nutrition preferences
-    filtered_recipes = recipes[
-        (recipes['Calories'] <= calories) &
-        (recipes['ProteinContent'] >= protein) &
-        (recipes['FatContent'] <= fat) &
-        (recipes['CarbohydrateContent'] <= carbs)
-    ]
+    return user_preferences
 
-    # Button to get 5 meal recommendations
-    if st.button("Get 5 Meal Recommendations"):
-        # Randomly select 5 meals from the filtered recipes
-        recommended_meals = filtered_recipes.sample(n=5)
-        st.write("### Top 5 Recommended Meals:")
-        st.write(recommended_meals[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent']])
-
-# Main function for the app
+# Main
+user_preferences = user_input_form()
+# Main logic for the app
 def main():
-    st.sidebar.title("📚 Navigation")
-    page = st.sidebar.radio("Choose a Page", ("Page 1: Weekly Meal Plan", "Page 2: Nutrition Preferences"))
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Choose a Page", ("Page 1: Demographics & Activity", "Page 2: Nutrition Preferences"))
 
-    # Page 1: Weekly Meal Planning
-    if page == "Page 1: Weekly Meal Plan":
-        user_meals = user_input_form_page1()
+# Add a button for user to submit their preferences
+submit_button = st.button('Get Recommendations')
+    user_preferences = {}
 
-    # Page 2: Meal Recommendations
+# Show the recommendations when the user clicks the button
+if submit_button and user_preferences:
+    top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
+    
+    st.write("### Top Recommended Recipes:")
+    st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
+    # Page 1: User Demographics & Activity
+    if page == "Page 1: Demographics & Activity":
+        user_preferences = user_input_form_page1()
+    # Page 2: Nutrition Preferences
     elif page == "Page 2: Nutrition Preferences":
-        user_input_form_page2()
-
+        user_preferences = user_input_form_page2()
+    # Add a button to get recommendations after both pages are filled
+    if st.button("Get Recommendations"):
+        if user_preferences:
+            top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
+            st.write("### Top Recommended Recipes:")
+            st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
 if __name__ == "__main__":
     main()
