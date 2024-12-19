@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 
 # Load the datasets (replace with your paths or upload them)
 recipes_path = 'recipes.csv'
@@ -55,14 +54,6 @@ def recommend_recipes(user_prefs, recipes_df, top_n=5):
     recommendations = recipes_scaled.sort_values(by=['Similarity', 'AverageRating'], ascending=[False, False])
     return recommendations.head(top_n)
 
-# Streamlit Frontend UI
-def user_input_form():
-    st.title('Nutrition Recommendation System')
-    # Collect user input for preferences
-    calories = st.slider('Max Calories:', 0, 1000, 500)
-    protein = st.slider('Min Protein Content (g):', 0, 100, 20)
-    fat = st.slider('Max Fat Content (g):', 0, 100, 15)
-    carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
 # Streamlit Frontend UI for Page 1 (Demographic and Activity)
 def user_input_form_page1():
     st.title('User Demographics & Activity Level')
@@ -105,11 +96,12 @@ def user_input_form_page1():
     }
     
     return user_preferences
+
 # Streamlit Frontend UI for Page 2 (Nutrition Preferences)
-def user_input_form_page2():
+def user_input_form_page2(daily_calorie_needs):
     st.title('Nutrition Preferences')
     # Collect user input for preferences
-    calories = st.slider('Max Calories:', 0, 1000, 500)
+    calories = st.slider('Max Calories:', 0, 1000, int(daily_calorie_needs))
     protein = st.slider('Min Protein Content (g):', 0, 100, 20)
     fat = st.slider('Max Fat Content (g):', 0, 100, 15)
     carbs = st.slider('Max Carbohydrate Content (g):', 0, 100, 50)
@@ -119,40 +111,29 @@ def user_input_form_page2():
         'ProteinContent': protein,
         'FatContent': fat,
         'CarbohydrateContent': carbs,
-        'EstimatedCalories': daily_calorie_needs  # Optional for further customization
-        'CarbohydrateContent': carbs
     }
 
     return user_preferences
 
-# Main
-user_preferences = user_input_form()
 # Main logic for the app
 def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Choose a Page", ("Page 1: Demographics & Activity", "Page 2: Nutrition Preferences"))
-
-# Add a button for user to submit their preferences
-submit_button = st.button('Get Recommendations')
     user_preferences = {}
 
-# Show the recommendations when the user clicks the button
-if submit_button and user_preferences:
-    top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
-    
-    st.write("### Top Recommended Recipes:")
-    st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
     # Page 1: User Demographics & Activity
     if page == "Page 1: Demographics & Activity":
         user_preferences = user_input_form_page1()
     # Page 2: Nutrition Preferences
-    elif page == "Page 2: Nutrition Preferences":
-        user_preferences = user_input_form_page2()
+    elif page == "Page 2: Nutrition Preferences" and 'EstimatedCalories' in user_preferences:
+        user_preferences.update(user_input_form_page2(user_preferences['EstimatedCalories']))
+
     # Add a button to get recommendations after both pages are filled
     if st.button("Get Recommendations"):
         if user_preferences:
             top_recipes = recommend_recipes(user_preferences, recipes, top_n=5)
             st.write("### Top Recommended Recipes:")
             st.write(top_recipes[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
+
 if __name__ == "__main__":
     main()
