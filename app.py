@@ -92,41 +92,14 @@ def user_input_form_page1():
     tdee = calculate_tdee(bmr, exercise)
 
     st.write(f"💡 Based on your input, your estimated daily calorie needs are: {int(tdee)} kcal.")
+    
     recommended_recipes = recommend_meals(tdee, goal)
-    st.write(f"### Recommended Meals for Your Goal: {goal}")
-    st.write(f"Meals that align with your target of {goal.lower()}:")
-    if st.button("Generate Weekly Meal Plan"):
-        weekly_meal_plan = generate_weekly_meal_plan(tdee, recipes)
-        st.write("### Your Weekly Meal Plan:")
-        st.write(weekly_meal_plan[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
+    
+    st.write(f"### Your Weekly Meal Plan:")
+    weekly_meal_plan = generate_weekly_meal_plan(tdee, recipes)
+    st.write(weekly_meal_plan[['Name', 'Calories', 'ProteinContent', 'FatContent', 'CarbohydrateContent', 'SodiumContent', 'AverageRating']])
 
-    for idx, row in recommended_recipes.iterrows():
-        st.write(f"**{row['Name']}**")
-        st.write(f"Calories: {row['Calories']} kcal, Protein: {row['ProteinContent']} g, Fat: {row['FatContent']} g, Carbs: {row['CarbohydrateContent']} g")
-        st.write("---")
     return tdee
-
-    if st.button("Generate Weekly Meal Plan"):
-        user_meals = {}
-        days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        meal_times = ["Breakfast", "Lunch", "Dinner"]
-        meal_plan_data = []
-        shuffled_recipes = recommended_recipes.sample(frac=1).reset_index(drop=True)
-        for day in days_of_week:
-            for meal_time in meal_times:
-                selected_meal = shuffled_recipes.iloc[len(meal_plan_data) % len(shuffled_recipes)]
-                meal_plan_data.append({
-                    'Day': day,
-                    'Meal Time': meal_time,
-                    'Meal Name': selected_meal['Name'],
-                    'Calories': selected_meal['Calories'],
-                    'FatContent': selected_meal['FatContent'],
-                    'ProteinContent': selected_meal['ProteinContent'],
-                    'CarbohydrateContent': selected_meal['CarbohydrateContent'],
-                })
-        meal_plan_df = pd.DataFrame(meal_plan_data)
-        st.write("### Your Weekly Meal Plan with Nutritional Information")
-        st.write(meal_plan_df)
 
 def user_input_form_page2():
     st.title('🍽️ Get 5 Meal Recommendations')
